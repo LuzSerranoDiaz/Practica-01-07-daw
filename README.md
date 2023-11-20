@@ -75,6 +75,37 @@ IP_CLIENTE_MYSQL=%
 
 #-----------------------------------------------------------------------
 ```
+## 000-default.conf
+```
+ServerSignature Off
+ServerTokens Prod
+
+<VirtualHost *:80>
+    #ServerName www.ejemplo.com
+    <Directory "/var/www/html">
+        AllowOverride All
+    </Directory>
+    DocumentRoot /var/www/html
+    DirectoryIndex index.php index.html
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+```
+
+## .htacess
+```
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+```
+
 ## setup_letsencrypt_certificate.sh
 ```bash
 #!/bin/bash
