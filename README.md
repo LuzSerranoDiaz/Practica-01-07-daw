@@ -63,8 +63,16 @@ En este script se realiza la instalación de LAMP en la última version de **ubu
 ```bash
 # Variables de configuración
 #-----------------------------------------------------------------------
-CERTIFICATE_EMAIL=demo@demo.es
 CERTIFICATE_DOMAIN=practica-15.ddns.net
+WORDPRESS_TITLE=practica-01-07
+WORDPRESS_DB_NAME=WORDPRESS_DB
+WORDPRESS_DB_USER=WORDPRESS_USER
+WORDPRESS_ADMIN_EMAIL=diaz03luz@gmail.com
+WORDPRESS_ADMIN_USER=LuzSerranoDiaz
+WORDPRESS_ADMIN_PASS=password123
+WORDPRESS_DB_PASSWORD=root
+IP_CLIENTE_MYSQL=%
+
 #-----------------------------------------------------------------------
 ```
 ## setup_letsencrypt_certificate.sh
@@ -118,7 +126,7 @@ Con el comando `certbot --apache` realizamos el certificado y con estos siguient
 * `-d $CERTIFICATE_DOMAIN` : indica el dominio, que en nuestro caso es 'practica-15.ddns.net', el dominio conseguido con el servicio de 'no-ip'
 * `--non-interactive` : indica que no solicite ningún tipo de dato de teclado.
 
-## deploy_wordpress_root_directory.sh
+## deploy_wordpress_with_wcpli.sh
 ```bash
 #!/bin/bash
  
@@ -132,49 +140,55 @@ source .env
 # ACtualizamos los paquetes del sistema
 # apt upgrade -y
 
-#instalamos zip
-sudo apt install zip -y
+# Eliminamos descargas previas de wp-cli
+rm -rf /tmp/wp-cli.phar
 
-#instalamos tar
-sudo apt install tar
-
-#borrar versiones anteriores en tmp wordpress
-rm -rf /tmp/latest.tar
-rm -rf /tmp/wordpress
-rm -rf /var/www/html/wp-admin
-rm -rf /var/www/html/wp-content
-rm -rf /var/www/html/wp-includes
 ```
-Realizamos los pasos previos para que el proceso funcione
-1. Importamos .env
-2. Actualizamos los repositorios
-3. Instalamos zip
-4. Instalamos tar
-5. Borramos las versiones anteriores a wordpress que causarían problemas en instalaciones repetidas
+Se realizan los pasos premeditarios:
+1. Actualizar repositorios.
+2. Actualizar los paquetes del sistema.
+3. Se importa .env.
+4. Elminamos las versiones anteriores de wp-cli en el sistema. 
 ```bash
-#poner wordpress en tmp
-wget http://wordpress.org/latest.tar.gz -P /tmp
 
-#descomprimimos el archivo gz
-gunzip /tmp/latest.tar.gz
+# Descargamos la herramienta wp-cli
+wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -P /tmp
 
-#descomprimimos el archivo tar
-tar -xvf /tmp/latest.tar -C /tmp
+# Le damos permisos de ejecución
+chmod +x /tmp/wp-cli.phar
 
-#Movemos wordpress 
-mv -f /tmp/wordpress/* /var/www/html
+# Movemos el archivo a /usr/local/bin
+mv /tmp/wp-cli.phar /usr/local/bin/wp
+
 ```
-1. Descargamos el paquete de wordpress
-2. Descomprimimos el archivo `.gz`
-3. Descomprimos el archivo `.tar`
-4. Movemos los archivos de wordpress a `/var/www/html`
+1. Se descarga la herramienta de wp-cli.
+2. Se le dan permisos de ejecución.
+3. Se mueven al archivo `/usr/local/wp` para poder utilizarlo como comando.
 ```bash
-#creamos la base de datos
+
+# Eliminamos instalaciones previas de WordPress
+rm -rf /var/www/html/*
+
+#Descargamos el codigo fuente de wordpress
+wp core download \
+  --locale=es_ES \
+  --path=/var/www/html \
+  --allow-root
+
+```
+Se borran las versiones previas de WordPress y se instala una version nueva con estos parametros:
+* `--locale=es_ES` : especifica el idioma.
+* `--path=/var/www/html` : especifica el directorio de la descarga. 
+* `--allow-root` : para poder ejecutar el comando como sudo.
+```bash
+
+# Creamos la base de datos y el usuario para wordpress
 mysql -u root <<< "DROP DATABASE IF EXISTS $WORDPRESS_DB_NAME"
 mysql -u root <<< "CREATE DATABASE $WORDPRESS_DB_NAME"
-mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL'"
-mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL' IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
-mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL'"
+mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
+mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
+mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
+
 ```
 Creamos la base de datos con estos comandos, inyectando las sentencias directamente con `<<<`
 1. Destruye la BD(WORDPRESS_DB) si existe
@@ -182,17 +196,33 @@ Creamos la base de datos con estos comandos, inyectando las sentencias directame
 3. Destruye el usuario(WORDPRESS_USER) si existe
 4. Crea el usuario(WORDPRESS_USER) con su contraseña(root)
 5. Le da al usuario todos los permisos de la BD(WORDPRESS_DB) al usuario(WORDPRESS_USER) 
-```
-
-#Creamos un archivo de configuracion 
-cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-
-#Configuramos el archivo wp-config.php
-sed -i "s/database_name_here/$WORDPRESS_DB_NAME/" /var/www/html/wp-config.php
-sed -i "s/username_here/$WORDPRESS_DB_USER/" /var/www/html/wp-config.php
-sed -i "s/password_here/$WORDPRESS_DB_PASSWORD/" /var/www/html/wp-config.php
-sed -i "s/localhost/$WORDPRESS_DB_HOST/" /var/www/html/wp-config.php
-```
-Creamos una archivo de configuracion a partir de uno de prueba en wordpress y lo configuramos con el comando `sed`, poniendo el nombre de la BD, el usuario, la contraseña y el host.
-
 ```bash
+
+#creacion del archivo de configuracion
+wp config create \
+  --dbname=$WORDPRESS_DB_NAME \
+  --dbuser=$WORDPRESS_DB_USER \
+  --dbpass=$WORDPRESS_DB_PASSWORD \
+  --dbhost=localhost \
+  --path=/var/www/html \
+  --allow-root
+
+#Instalacion de wordpress
+wp core install \
+  --url=$CERTIFICATE_DOMAIN \
+  --title="$WORDPRESS_TITLE" \
+  --admin_user=$WORDPRESS_ADMIN_USER \
+  --admin_password=$WORDPRESS_ADMIN_PASS \
+  --admin_email=$WORDPRESS_ADMIN_EMAIL \
+  --path=/var/www/html \
+  --allow-root  
+
+# Instalamos un tema de WordPress
+wp theme install joyas-shop --activate --path=/var/www/html --allow-root
+
+# Instalamos un plugin para esconder la ruta wp-admin de wordpress
+wp plugin install wps-hide-login --path=/var/www/html --allow-root
+
+# Modificarmos los premisos de /var/www/html
+chown -R www-data:www-data /var/www/html
+```
