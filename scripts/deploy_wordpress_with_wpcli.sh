@@ -10,71 +10,33 @@ source .env
 # ACtualizamos los paquetes del sistema
 # apt upgrade -y
 
-#instalamos zip
-sudo apt install zip -y
+# Eliminamos descargas previas de wp-cli
+rm -rf /tmp/wp-cli.phar
 
-#instalamos tar
-sudo apt install tar
+# Descargamos la herramienta wp-cli
+wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -P /tmp
 
-#borrar versiones anteriores en tmp wordpress
-rm -rf /tmp/latest.tar
-rm -rf /tmp/wordpress
-rm -rf /var/www/html/wp-admin
-rm -rf /var/www/html/wp-content
-rm -rf /var/www/html/wp-includes
+# Le damos permisos de ejecución
+chmod +x /tmp/wp-cli.phar
 
+# Movemos el archivo a /usr/local/bin
+mv /tmp/wp-cli.phar /usr/local/bin/wp
 
-
-#poner wordpress en tmp
-wget http://wordpress.org/latest.tar.gz -P /tmp
-
-#descomprimimos el archivo gz
-gunzip /tmp/latest.tar.gz
-
-#descomprimimos el archivo tar
-tar -xvf /tmp/latest.tar -C /tmp
-
-#Movemos wordpress 
-mv -f /tmp/wordpress/* /var/www/html
-
-#creamos la base de datos
-mysql -u root <<< "DROP DATABASE IF EXISTS $WORDPRESS_DB_NAME"
-mysql -u root <<< "CREATE DATABASE $WORDPRESS_DB_NAME"
-mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL'"
-mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL' IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
-mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@'$IP_CLIENTE_MYSQL'"
-
-#Creamos un archivo de configuracion 
-cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-
-#Configuramos el archivo wp-config.php
-sed -i "s/database_name_here/$WORDPRESS_DB_NAME/" /var/www/html/wp-config.php
-sed -i "s/username_here/$WORDPRESS_DB_USER/" /var/www/html/wp-config.php
-sed -i "s/password_here/$WORDPRESS_DB_PASSWORD/" /var/www/html/wp-config.php
-sed -i "s/localhost/$WORDPRESS_DB_HOST/" /var/www/html/wp-config.php
-
-#Habilitamos el modulo rewrite
-a2enmod rewrite
-
-#Creamos el archivo .htaccess en var/www/html
-cp ../htaccess/.htaccess /var/www/html/.htaccess
-
-systemctl restart apache2
-
-#Decargamos WP-CLI
-curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
-
-#permisos de ejecucion
-chmod +x wp-cli.phar
-
-#movemos a /bin/ para poderlo ejecutar como comando
-mv wp-cli.phar /usr/local/bin/wp
+# Eliminamos instalaciones previas de WordPress
+rm -rf /var/www/html/*
 
 #Descargamos el codigo fuente de wordpress
 wp core download \
   --locale=es_ES \
   --path=/var/www/html \
   --allow-root
+
+# Creamos la base de datos y el usuario para wordpress
+mysql -u root <<< "DROP DATABASE IF EXISTS $WORDPRESS_DB_NAME"
+mysql -u root <<< "CREATE DATABASE $WORDPRESS_DB_NAME"
+mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
+mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
+mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
 
 #creacion del archivo de configuracion
 wp config create \
@@ -85,23 +47,21 @@ wp config create \
   --path=/var/www/html \
   --allow-root
 
-#comprobacion de los valores del archivo de configuracion
-wp config get \
-  --path=/var/www/html \
-  --allow-root
-
 #Instalacion de wordpress
 wp core install \
   --url=$CERTIFICATE_DOMAIN \
-  --title="Practica-07" \
-  --admin_user=LuzSerranoDiaz \
-  --admin_password=password123 \
-  --admin_email=diaz03luz@gmail.com \
+  --title="$WORDPRESS_TITLE" \
+  --admin_user=$WORDPRESS_ADMIN_USER \
+  --admin_password=$WORDPRESS_ADMIN_PASS \
+  --admin_email=$WORDPRESS_ADMIN_EMAIL \
   --path=/var/www/html \
   --allow-root  
 
-chown -R www-data:www-data /var/www/html/
+# Instalamos un tema de WordPress
+wp theme install joyas-shop --activate --path=/var/www/html --allow-root
 
-wp rewrite structure '/%postname%/' \
-  --path=/var/www/html \
-  --allow-root
+# Instalamos un plugin para esconder la ruta wp-admin de wordpress
+wp plugin install wps-hide-login --path=/var/www/html --allow-root
+
+# Modificarmos los premisos de /var/www/html
+chown -R www-data:www-data /var/www/html
