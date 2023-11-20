@@ -207,6 +207,14 @@ wp config create \
   --path=/var/www/html \
   --allow-root
 
+```
+Con este comando se crea el archivo de configuración, se automatiza con estos parametros:
+* `--dbname` : se le especifica el nombre de la bases de datos.
+* `--dbuser` : se le especifica el nombre del usuario de la base de datos.
+* `--dbpass` : se le especifica la contraseña del usuario de la base de datos.
+* `--dbhost` : se le especifica host de la base de datos.
+```
+
 #Instalacion de wordpress
 wp core install \
   --url=$CERTIFICATE_DOMAIN \
@@ -217,12 +225,26 @@ wp core install \
   --path=/var/www/html \
   --allow-root  
 
+```
+Con este comando se completa la instalación de wordpress y se automatiza con estos parametros:
+* `--url` : se especifica el dominio del sitio de WordPress.
+* `--title` : se especifica el titulo del sitio WordPress.
+* `--admin-user` : se especifica el usuario administrador.
+* `--admin-password` : se especifica la contraseña del usuario administrador.
+* `--admin-email` : se especifica el email del usuario administrador.
+```bash
+
 # Instalamos un tema de WordPress
 wp theme install joyas-shop --activate --path=/var/www/html --allow-root
 
 # Instalamos un plugin para esconder la ruta wp-admin de wordpress
 wp plugin install wps-hide-login --path=/var/www/html --allow-root
 
+```
+1. Se instala el tema `joyas-shop`, en la ruta `/var/www/html` y puede ser ejecutado por sudo.
+2. Se instala el plugin `wps-hide-login` que permite esconder la ruta wp-admin de wordpress.
+```
 # Modificarmos los premisos de /var/www/html
 chown -R www-data:www-data /var/www/html
 ```
+Se modifica los permisos de `/var/www/html` a www-data.
